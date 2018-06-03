@@ -1,0 +1,20 @@
+h1 Queue
+p.lead Here are all the episodes that are still missing subtitles.
+
+div.queue-table
+  table.table
+    thead
+      tr
+        th Added On
+        th Title
+        th Scene Name
+        th Actions
+    tbody
+      for item in queue
+        tr
+          td #{item.createdAtFormatted()}
+          td #{item.title}
+          td #{item.sceneName}
+          td
+            i(data-id=item._id).search.fa.fa-search
+            i(data-id=item._id).delete.fa.fa-trash

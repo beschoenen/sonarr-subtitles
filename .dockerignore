@@ -1,0 +1,7 @@
+node_modules
+test
+.idea
+.travis.yml
+*.log
+LICENSE
+package-lock.json
