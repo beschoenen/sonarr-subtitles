@@ -1,7 +1,7 @@
 h1 Queue
 p.lead Here are all the episodes that are still missing subtitles.
 
-div.queue-table
+div.horizontal-scroll
   table.table
     thead
       tr
@@ -10,11 +10,15 @@ div.queue-table
         th Scene Name
         th Actions
     tbody
-      for item in queue
+      if queue.length < 1
         tr
-          td #{item.createdAtFormatted()}
-          td #{item.title}
-          td #{item.sceneName}
-          td
-            i(data-id=item._id).search.fa.fa-search
-            i(data-id=item._id).delete.fa.fa-trash
+          td(colspan='4') No items in the queue.
+      else
+        for item in queue
+          tr
+            td #{item.createdAtFormatted()}
+            td #{item.title}
+            td #{item.sceneName}
+            td
+              i(data-id=item._id).search.fa.fa-search
+              i(data-id=item._id).delete.fa.fa-trash

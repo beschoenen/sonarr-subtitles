@@ -71,13 +71,13 @@ textarea {
   }
 }
 
-// Queue Table
+// Other
 // ------------------------
 
-div.queue-table {
+div.horizontal-scroll {
   overflow-y: scroll;
+}
 
-  > table {
-    min-width: 650px;
-  }
+table.queue-table {
+  min-width: 650px;
 }
