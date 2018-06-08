@@ -14,7 +14,7 @@ export const ENVIRONMENT = process.env.NODE_ENV;
 export const MONGO_HOST = process.env["MONGO_HOST"];
 export const AVISTAZ_USERNAME = process.env["AVISTAZ_USERNAME"];
 export const AVISTAZ_PASSWORD = process.env["AVISTAZ_PASSWORD"];
-export const SEARCH_SCHEDULE = process.env["SEARCH_SCHEDULE"] || "0 0 0 */15 * *";
+export const SEARCH_SCHEDULE = process.env["SEARCH_SCHEDULE"] || "0 */15 * * * *";
 export const TZ = process.env["TZ"] || "Europe/Amsterdam";
 
 if (!MONGO_HOST) {
