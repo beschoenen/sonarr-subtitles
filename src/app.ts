@@ -35,7 +35,7 @@ mongoose.connect(`mongodb://${MONGO_HOST}/sonarr-subtitles`, {useMongoClient: tr
 
 ////////////////////////
 // Express configuration
-app.set("port", process.env.PORT || 3000);
+app.set("port", process.env.PORT || 9501);
 app.set("views", path.join(__dirname, "../views"));
 app.set("view engine", "pug");
 app.use(compression());
