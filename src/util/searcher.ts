@@ -3,6 +3,7 @@ import { providerManager } from "./providerManager";
 import Bluebird from "bluebird";
 import SearchResult from "../models/SearchResult";
 import * as fs from "fs";
+import { sendMessage } from "./telegram";
 
 export function search(queue: QueueDocument): Bluebird<string> {
   console.log(`Searching for ${queue.sceneName}`);
@@ -23,6 +24,7 @@ export function search(queue: QueueDocument): Bluebird<string> {
         results.sort(compare);
         results[0].provider.download(results[0], queue).then(() => {
           Queue.deleteOne({_id: queue._id}).exec().then(() => {
+            sendMessage(`Subtitles downloaded for ${queue.title}`);
             resolve(`Subtitles downloaded for ${queue.sceneName}`);
           });
         });
