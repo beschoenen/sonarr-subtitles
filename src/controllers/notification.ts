@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { default as Queue, QueueDocument } from "../models/Database/Queue";
+import { default as Queue } from "../models/Database/Queue";
 import Sonarr from "../parsers/Sonarr";
 import * as searcher from "../util/searcher";
 
@@ -29,10 +29,15 @@ export let sonarr = (req: Request, res: Response) => {
     return res.send("Something is wrong with the payload.");
   }
 
-  Queue.create(model).catch(console.error).then((queue: QueueDocument) => {
-    console.log(`Added ${model.sceneName} to queue`);
-    res.send("Sub grad queued.");
+  console.log(`Added ${model.sceneName} to queue`);
 
-    searcher.search(queue).then(console.log).catch(console.error);
-  });
+  Queue.create(model)
+    .catch(console.error)
+    .then(queue => {
+      res.send("Sub grad queued.");
+      return queue;
+    })
+    .then(searcher.search)
+    .catch(console.error)
+    .then(console.log);
 };

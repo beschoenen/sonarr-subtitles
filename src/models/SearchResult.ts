@@ -35,6 +35,6 @@ export default interface SearchResult {
   /**
    * The Provider on which the result was found.
    */
-  provider?: BaseProvider;
+  provider: BaseProvider;
 
 }

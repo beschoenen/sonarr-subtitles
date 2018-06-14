@@ -1,9 +1,10 @@
 import SearchResult from "../models/SearchResult";
 import BaseProvider from "./BaseProvider";
 import Bluebird from "bluebird";
-import request, { CookieJar } from "request";
+import request, { CookieJar, RequestResponse, UrlOptions } from "request";
 import cheerio from "cheerio";
 import * as secrets from "../util/secrets";
+import rp, { RequestPromiseOptions } from "request-promise";
 
 interface AvistazLogin {
   _token?: string;
@@ -42,52 +43,41 @@ export default class Avistaz extends BaseProvider {
   public search(phrase: string): Bluebird<SearchResult[]> {
     console.log(`Searching AvistaZ for ${phrase}`);
 
-    return new Bluebird<SearchResult[]>((resolve, reject) => {
-      this.test().catch(() => this.login()).then(() => {
-        this.findReleases(phrase)
-          .then(releases => this.getReleasePages(releases))
-          .then(results => resolve(results))
-          .catch(console.error);
-      });
-    });
+    return this.test()
+      .catch(this.login)
+      .then(() => this.findReleases(phrase))
+      .then(this.getReleases);
   }
 
   protected getFile(result: SearchResult): Bluebird<string> {
     console.log(`Downloading subtitle file from AvistaZ`);
 
-    return new Bluebird((resolve, reject) => {
-      this.test().catch(() => this.login()).then(() => {
-        request(result.url, {jar: this.cookieJar}, function (error, response, body) {
-          resolve(body);
-        });
-      });
-    });
+    const options: RequestPromiseOptions & UrlOptions = {
+      url: result.url,
+      jar: this.cookieJar
+    };
+
+    return this.test()
+      .catch(this.login)
+      .then(() => rp(options));
   }
 
-  private getReleasePages(releases: AvistazRelease[]): Bluebird<SearchResult[]> {
-    const results: SearchResult[] = [];
-
-    return new Bluebird((resolve, reject) => {
-      Bluebird.each(releases, async (release: AvistazRelease) => {
-        const self = this;
-        return new Bluebird<void>(async (resolve, reject) => {
-          await request(release.url, {jar: this.cookieJar}, async function (error, response, body) {
-            if (error) {
-              return reject(error);
-            }
-
-            // .concat does not work
-            const t = self.parseReleasePages(cheerio.load(body));
-            t.forEach(e => results.push(e));
-
-            await resolve();
-          });
-        });
-      }).then(() => resolve(results));
-    });
+  private getReleases(releases: AvistazRelease[]): Bluebird<SearchResult[]> {
+    return Bluebird.map(releases, this.getReleasePage)
+      .then(results => [].concat.apply([], results));
   }
 
-  private parseReleasePages($: CheerioStatic): SearchResult[] {
+  private getReleasePage(release: AvistazRelease): Bluebird<SearchResult[]> {
+    const options: RequestPromiseOptions & UrlOptions = {
+      url: release.url,
+      jar: this.cookieJar,
+      transform: body => cheerio.load(body)
+    };
+
+    return rp(options).then(this.parseReleasePage);
+  }
+
+  private parseReleasePage($: CheerioStatic): SearchResult[] {
     const results: SearchResult[] = [];
 
     $("table").last().find("tbody tr").each((index, element) => {
@@ -97,7 +87,8 @@ export default class Avistaz extends BaseProvider {
         size: $($(element).find("td")[2]).text(),
         score: parseInt($("td div.likes span.count").text()),
         url: $($(element).find("td")[1]).find("a").attr("href"),
-        ext: $($(element).find("td")[1]).find("a").attr("href").split(".").pop()
+        ext: $($(element).find("td")[1]).find("a").attr("href").split(".").pop(),
+        provider: this
       });
     });
 
@@ -105,11 +96,15 @@ export default class Avistaz extends BaseProvider {
   }
 
   private findReleases(phrase: string): Bluebird<AvistazRelease[]> {
-    return new Bluebird((resolve, reject) => {
-      request(`${this.searchUrl}=${Avistaz.sanitizePhrase(phrase)}`, {jar: this.cookieJar}, (error, response, body) => {
-        resolve(this.parseReleases(cheerio.load(body)));
-      });
-    });
+    const options: RequestPromiseOptions & UrlOptions = {
+      url: `${this.searchUrl}=${Avistaz.sanitizePhrase(phrase)}`,
+      jar: this.cookieJar,
+      transform: body => cheerio.load(body)
+    };
+
+    return rp(options)
+      .catch(console.error)
+      .then(this.parseReleases);
   }
 
   private parseReleases($: CheerioStatic): AvistazRelease[] {
@@ -120,13 +115,13 @@ export default class Avistaz extends BaseProvider {
         return $(this).find("strong").text() === "Sub:";
       });
 
-      if (elements.length > 0) {
-        releases.push({
-          release: $(element).find("a.torrent-filename").first().text().trim(),
-          subLanguage: $(elements).first().find("a").first().attr("title"),
-          url: $(element).find("a.torrent-filename").first().attr("href"),
-        });
-      }
+      if (elements.length < 1) return;
+
+      releases.push({
+        release: $(element).find("a.torrent-filename").first().text().trim(),
+        subLanguage: $(elements).first().find("a").first().attr("title"),
+        url: $(element).find("a.torrent-filename").first().attr("href"),
+      });
     });
 
     return releases;
@@ -141,71 +136,63 @@ export default class Avistaz extends BaseProvider {
       remember: "1"
     };
 
-    return new Bluebird((resolve, reject) => {
-      this.getToken()
-        .then(token => info._token = token).catch(reject)
-        .then(() => {
-          const self = this;
-          request.post(this.loginUrl, {form: info, jar: this.cookieJar}, function (error, response, body) {
-            if (error) {
-              return reject(error);
-            }
+    const options: RequestPromiseOptions & UrlOptions = {
+      url: this.loginUrl,
+      jar: this.cookieJar,
+      resolveWithFullResponse: true
+    };
 
-            // TODO
-            // if (r.uri.href === self.loginUrl) {
-            //   return reject("Could not log in");
-            // }
+    return this.getToken()
+      .then(token => info._token = token)
+      .then(() => rp(options))
+      .then((response: RequestResponse) => {
+        // if (r.uri.href === self.loginUrl) {
+        //   return reject("Could not log in");
+        // }
 
-            response.headers["set-cookie"].forEach(cookie => {
-              self.cookieJar.setCookie(cookie, self.baseUrl);
-            });
-
-            resolve();
-          });
+        response.headers["set-cookie"].forEach(cookie => {
+          this.cookieJar.setCookie(cookie, this.baseUrl);
         });
-    });
+      });
   }
 
   private getToken(): Bluebird<string> {
     const tokenRegex = /<meta name="_token" content="(.*?)">/;
+    const options: RequestPromiseOptions & UrlOptions = {
+      url: this.loginUrl,
+      jar: this.cookieJar,
+      resolveWithFullResponse: true
+    };
 
-    return new Bluebird((resolve, reject) => {
-      const self = this;
-      request(this.loginUrl, {jar: this.cookieJar}, function (error, response, body) {
-        if (error) {
-          return reject(error);
-        }
-
+    return rp(options)
+      .then((response: RequestResponse) => {
         response.headers["set-cookie"].forEach(cookie => {
-          self.cookieJar.setCookie(cookie, self.baseUrl);
+          this.cookieJar.setCookie(cookie, this.baseUrl);
         });
 
-        const regex = tokenRegex.exec(body);
+        const regex = tokenRegex.exec(response.body);
 
         if (!regex || !regex[1]) {
-          return reject();
+          throw "Invalid HTML";
         }
 
-        resolve(regex[1]);
+        return regex[1];
       });
-    });
   }
 
   private test(): Bluebird<void> {
-    return new Bluebird<void>((resolve, reject) => {
-      const self = this;
-      const r = request(this.testUrl, {jar: this.cookieJar}, function (error, response, body) {
-        if (error) {
-          return reject();
-        }
+    const options: RequestPromiseOptions & UrlOptions = {
+      url: this.testUrl,
+      jar: this.cookieJar,
+      resolveWithFullResponse: true
+    };
 
-        if (r.uri.href === self.loginUrl) {
-          return reject();
+    return rp(options)
+      .then((response: RequestResponse) => {
+        if (response.url === this.loginUrl) {
+          throw "Could not login";
         }
-
-        resolve();
       });
-    });
   }
 
   /**

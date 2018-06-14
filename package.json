@@ -27,6 +27,7 @@
     "watch-debug": "concurrently -k -p \"[{name}]\" -n \"Sass,TypeScript,Node\" -c \"yellow.bold,cyan.bold,green.bold\" \"npm run watch-sass\" \"npm run watch-ts\" \"npm run serve-debug\""
   },
   "dependencies": {
+    "@types/request-promise": "^4.1.41",
     "@types/telebot": "^1.2.1",
     "async": "^2.6.1",
     "bcrypt-nodejs": "^0.0.3",
@@ -47,6 +48,7 @@
     "mongoose": "^4.13.14",
     "pug": "^2.0.3",
     "request": "^2.87.0",
+    "request-promise": "^4.2.2",
     "telebot": "github:mullwar/telebot",
     "winston": "^2.4.2"
   },

@@ -27,14 +27,26 @@ export default abstract class BaseProvider {
    * @returns {Bluebird<string>}
    */
   public download(result: SearchResult, queue: QueueModel): Bluebird<void> {
-    return this.getFile(result).then(content => {
-      const filename = queue.fileName.split(".");
+    return this.getFile(result).then(content => this.writeFile(queue.fileName, result.ext, queue.folder, content));
+  }
+
+  /**
+   * Write the contents of the searchResult to a file
+   * @param {string} fileName
+   * @param {string} extension
+   * @param {string} folder
+   * @param {string} content
+   * @returns {Bluebird<void>}
+   */
+  private writeFile(fileName: string, extension: string, folder: string, content: string): Bluebird<void> {
+    return new Bluebird<void>((resolve, reject) => {
+      const filename = fileName.split(".");
       filename.pop();
 
       fs.writeFile(
-        path.join(queue.folder, `${filename.join(".")}.${result.ext || "srt"}`),
+        path.join(folder, `${filename.join(".")}.${extension || "srt"}`),
         content,
-        error => error ? Bluebird.reject(error) : Bluebird.resolve()
+        error => error ? reject(error) : resolve()
       );
     });
   }

@@ -15,16 +15,8 @@ class ProviderManager {
   }
 
   public search(phrase: string): Bluebird<SearchResult[]> {
-    const items: SearchResult[] = [];
-
-    return Bluebird.each(this.providers, (provider: BaseProvider) => {
-      return provider.search(phrase).then(results => {
-        results.forEach(result => {
-          result.provider = provider;
-          items.push(result);
-        });
-      });
-    }).then(() => Bluebird.resolve(items));
+    return Bluebird.map(this.providers, (provider: BaseProvider) => provider.search(phrase))
+      .then(results => [].concat.apply([], results));
   }
 }
 

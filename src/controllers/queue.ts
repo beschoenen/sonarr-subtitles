@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import Queue, { QueueDocument } from "../models/Database/Queue";
+import Queue  from "../models/Database/Queue";
 import * as searcher from "../util/searcher";
 
 /**
@@ -12,19 +12,20 @@ export let search = (req: Request, res: Response) => {
     return res.send("No queue item selected");
   }
 
-  Queue.findOne({_id: req.params.queue}).exec().then((queue: QueueDocument) => {
-    searcher.search(queue).then(result => {
+  Queue.findOne({_id: req.params.queue}).exec()
+    .catch(error => {
+      console.error(error);
+      res.status(500);
+      res.json({success: false, message: "An error occurred", error});
+    })
+    .then(searcher.search)
+    .then(result => {
       console.log(result);
       res.json({success: true, message: result});
     }).catch(result => {
       console.log(result);
       res.json({success: false, message: result});
     });
-  }).catch(error => {
-    console.error(error);
-    res.status(500);
-    res.json({success: false, message: "An error occurred", error});
-  });
 };
 
 /**
@@ -37,11 +38,12 @@ export let remove = (req: Request, res: Response) => {
     return res.send("No queue item selected");
   }
 
-  Queue.deleteOne({_id: req.params.queue}).exec().then(() => {
-    res.json({success: true, message: "Item deleted"});
-  }).catch(error => {
-    console.error(error);
-    res.status(500);
-    res.json({success: false, message: "An error occurred", error});
-  });
+  Queue.deleteOne({_id: req.params.queue}).exec()
+    .then(() => {
+      res.json({success: true, message: "Item deleted"});
+    }).catch(error => {
+      console.error(error);
+      res.status(500);
+      res.json({success: false, message: "An error occurred", error});
+    });
 };
