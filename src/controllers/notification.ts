@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import { default as Queue } from "../models/Database/Queue";
 import Sonarr from "../parsers/Sonarr";
 import * as searcher from "../util/searcher";
+import logger from "../util/logger";
+import Bluebird from "bluebird";
 
 /**
  * POST /notifications/sonarr
@@ -9,35 +11,31 @@ import * as searcher from "../util/searcher";
  */
 export let sonarr = (req: Request, res: Response) => {
   if (req.body.eventType === "Test") {
-    console.log("Got test request from Sonarr");
-    return res.send("Sonarr test successful. :)");
+    logger.debug("Got test request from Sonarr");
+    return res.json({success: true, message: "Sonarr test successful"});
   }
 
   if (req.body.eventType !== "Download") {
-    console.error("Got unsupported event type request from Sonarr");
-
-    res.status(400);
-    return res.send(`Unsupported event type: ${req.body.eventType}`);
+    logger.warning("Got unsupported event type request from Sonarr");
+    return res.status(400).json({success: false, message: `Unsupported event type: ${req.body.eventType || "none"}`});
   }
 
   const model = Sonarr.fromPayload(req.body);
 
   if (!model) {
-    console.error("Could not create a model");
-
-    res.status(400);
-    return res.send("Something is wrong with the payload.");
+    logger.error("Could not parse payload to model");
+    return res.status(400).json({success: false, message: "Something is wrong with the payload"});
   }
 
-  console.log(`Added ${model.sceneName} to queue`);
+  Queue.create(model).then(queue => {
+    logger.debug(`Added ${model.sceneName} to queue`);
+    res.json({success: true, message: "Subtitle queued for download"});
 
-  Queue.create(model)
-    .catch(console.error)
-    .then(queue => {
-      res.send("Sub grad queued.");
-      return queue;
-    })
-    .then(searcher.search)
-    .catch(console.error)
-    .then(console.log);
+    return queue;
+  }, error => {
+    logger.error(error);
+    res.status(500).json({success: false, message: "An error occurred"});
+
+    return Bluebird.reject(error);
+  }).then(searcher.search);
 };

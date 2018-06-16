@@ -4,13 +4,14 @@ import Bluebird from "bluebird";
 import SearchResult from "../models/SearchResult";
 import * as fs from "fs";
 import { sendMessage } from "./telegram";
+import logger from "./logger";
 
 export function search(queue: QueueDocument): Bluebird<string> {
-  console.log(`Searching for ${queue.sceneName}`);
+  logger.debug(`Searching for ${queue.sceneName}`);
 
   if (!fs.existsSync(`${queue.folder}/${queue.fileName}`)) {
-    Queue.deleteOne({_id: queue._id}).exec();
-    return Bluebird.reject("Video file does not exist anymore.");
+    Queue.deleteOne({_id: queue._id}).exec(); // TODO handle promise
+    return Bluebird.reject("Video file does not exist anymore");
   }
 
   return providerManager

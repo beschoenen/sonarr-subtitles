@@ -6,6 +6,7 @@ import cheerio from "cheerio";
 import * as secrets from "../util/secrets";
 import rp, { RequestPromiseOptions } from "request-promise";
 import { StatusCodeError } from "request-promise/errors";
+import logger from "../util/logger";
 
 interface AvistazLogin {
   _token?: string;
@@ -32,7 +33,7 @@ export default class Avistaz extends BaseProvider {
   constructor() {
     super();
 
-    console.log("Initializing AvistaZ");
+    logger.debug("Initializing AvistaZ");
 
     this.baseUrl = "https://avistaz.to";
     this.testUrl = `${this.baseUrl}/torrents`;
@@ -42,7 +43,7 @@ export default class Avistaz extends BaseProvider {
   }
 
   public search(phrase: string): Bluebird<SearchResult[]> {
-    console.log(`Searching AvistaZ for ${phrase}`);
+    logger.debug(`Searching AvistaZ for ${phrase}`);
 
     return this.test()
       .catch(() => this.login())
@@ -51,7 +52,7 @@ export default class Avistaz extends BaseProvider {
   }
 
   protected getFile(result: SearchResult): Bluebird<string> {
-    console.log(`Downloading subtitle file from AvistaZ`);
+    logger.debug(`Downloading subtitle file from AvistaZ`);
 
     const options: RequestPromiseOptions & UrlOptions = {
       url: result.url,
@@ -64,8 +65,7 @@ export default class Avistaz extends BaseProvider {
   }
 
   private getReleases(releases: AvistazRelease[]): Bluebird<SearchResult[]> {
-    return Bluebird.map(releases, release => this.getReleasePage(release))
-      .then(results => [].concat.apply([], results));
+    return Bluebird.map(releases, release => this.getReleasePage(release)).then(results => [].concat(...results));
   }
 
   private getReleasePage(release: AvistazRelease): Bluebird<SearchResult[]> {
@@ -104,7 +104,7 @@ export default class Avistaz extends BaseProvider {
     };
 
     return rp(options)
-      .catch(console.error)
+      .catch(logger.error)
       .then(this.parseReleases);
   }
 
@@ -129,7 +129,7 @@ export default class Avistaz extends BaseProvider {
   }
 
   private login(): Bluebird<void> {
-    console.log("Logging into AvistaZ");
+    logger.debug("Logging into AvistaZ");
 
     const info: AvistazLogin = {
       email_username: secrets.AVISTAZ_USERNAME,
@@ -150,6 +150,7 @@ export default class Avistaz extends BaseProvider {
       .then(() => rp(options))
       .then((response: RequestResponse) => {
         if (response.request.uri.href === this.loginUrl) {
+          logger.error("Could not login");
           throw "Could not login";
         }
       }).catch((error: StatusCodeError) => {
@@ -166,13 +167,12 @@ export default class Avistaz extends BaseProvider {
     };
 
     return rp(options).then((response: RequestResponse) => {
-      response.headers["set-cookie"].forEach(cookie => {
-        this.cookieJar.setCookie(cookie, this.baseUrl);
-      });
+      response.headers["set-cookie"].forEach(cookie => this.cookieJar.setCookie(cookie, this.baseUrl));
 
       const regex = tokenRegex.exec(response.body);
 
       if (!regex || !regex[1]) {
+        logger.error("Invalid HTML");
         throw "Invalid HTML";
       }
 
@@ -189,6 +189,7 @@ export default class Avistaz extends BaseProvider {
 
     return rp(options).then((response: RequestResponse) => {
       if (response.request.uri.href === this.loginUrl) {
+        logger.error("Could not login");
         throw "Could not login";
       }
     });

@@ -1,10 +1,10 @@
 import { QueueModel } from "../models/Database/Queue";
 import * as path from "path";
+import logger from "../util/logger";
 
 export default class Sonarr {
 
   public static fromPayload(payload: any): QueueModel | undefined {
-
     let queue: QueueModel | undefined;
 
     const pathSplit = payload.episodeFile.relativePath.split("/");
@@ -22,13 +22,13 @@ export default class Sonarr {
         folder: path.join(payload.series.path, pathSplit.join("/"))
       };
     } catch (error) {
-      console.log(error);
+      logger.error(error);
     }
 
     return queue;
   }
 
-  private static pad (value: string, pad: number): string {
+  private static pad(value: string, pad: number): string {
     if (value.length >= pad) return value;
 
     return this.pad(`0${value}`, pad);

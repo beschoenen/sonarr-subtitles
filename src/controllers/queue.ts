@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
-import Queue  from "../models/Database/Queue";
+import Queue from "../models/Database/Queue";
 import * as searcher from "../util/searcher";
+import logger from "../util/logger";
+import Bluebird from "bluebird";
 
 /**
  * POST /queue/:queue/search
@@ -8,24 +10,21 @@ import * as searcher from "../util/searcher";
  */
 export let search = (req: Request, res: Response) => {
   if (!req.params.queue) {
-    res.status(400);
-    return res.send("No queue item selected");
+    return res.status(400).send({success: false, message: "No queue item selected"});
   }
 
-  Queue.findOne({_id: req.params.queue}).exec()
-    .catch(error => {
-      console.error(error);
-      res.status(500);
-      res.json({success: false, message: "An error occurred", error});
-    })
-    .then(searcher.search)
-    .then(result => {
-      console.log(result);
-      res.json({success: true, message: result});
-    }).catch(result => {
-      console.log(result);
-      res.json({success: false, message: result});
-    });
+  Queue.findOne({_id: req.params.queue}).exec().then(searcher.search, error => {
+    logger.error(error);
+    res.status(500).json({success: false, message: "An error occurred"});
+
+    return Bluebird.reject(error);
+  }).then(result => {
+    logger.debug(result);
+    res.json({success: true, message: result});
+  }, result => {
+    logger.error(result);
+    res.status(500).json({success: false, message: result});
+  });
 };
 
 /**
@@ -34,16 +33,14 @@ export let search = (req: Request, res: Response) => {
  */
 export let remove = (req: Request, res: Response) => {
   if (!req.params.queue) {
-    res.status(400);
-    return res.send("No queue item selected");
+    return res.status(400).send({success: false, message: "No queue item selected"});
   }
 
-  Queue.deleteOne({_id: req.params.queue}).exec()
-    .then(() => {
-      res.json({success: true, message: "Item deleted"});
-    }).catch(error => {
-      console.error(error);
-      res.status(500);
-      res.json({success: false, message: "An error occurred", error});
-    });
+  Queue.deleteOne({_id: req.params.queue}).exec().then(() => {
+    logger.debug("Item deleted");
+    res.json({success: true, message: "Item deleted"});
+  }, error => {
+    logger.error(error);
+    res.status(500).json({success: false, message: "An error occurred"});
+  });
 };

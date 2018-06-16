@@ -16,7 +16,7 @@ class ProviderManager {
 
   public search(phrase: string): Bluebird<SearchResult[]> {
     return Bluebird.map(this.providers, (provider: BaseProvider) => provider.search(phrase))
-      .then(results => [].concat.apply([], results));
+      .then(results => [].concat(...results));
   }
 }
 
