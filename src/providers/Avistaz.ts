@@ -5,6 +5,7 @@ import request, { CookieJar, RequestResponse, UrlOptions } from "request";
 import cheerio from "cheerio";
 import * as secrets from "../util/secrets";
 import rp, { RequestPromiseOptions } from "request-promise";
+import { StatusCodeError } from "request-promise/errors";
 
 interface AvistazLogin {
   _token?: string;
@@ -44,9 +45,9 @@ export default class Avistaz extends BaseProvider {
     console.log(`Searching AvistaZ for ${phrase}`);
 
     return this.test()
-      .catch(this.login)
+      .catch(() => this.login())
       .then(() => this.findReleases(phrase))
-      .then(this.getReleases);
+      .then(releases => this.getReleases(releases));
   }
 
   protected getFile(result: SearchResult): Bluebird<string> {
@@ -58,12 +59,12 @@ export default class Avistaz extends BaseProvider {
     };
 
     return this.test()
-      .catch(this.login)
+      .catch(() => this.login())
       .then(() => rp(options));
   }
 
   private getReleases(releases: AvistazRelease[]): Bluebird<SearchResult[]> {
-    return Bluebird.map(releases, this.getReleasePage)
+    return Bluebird.map(releases, release => this.getReleasePage(release))
       .then(results => [].concat.apply([], results));
   }
 
@@ -74,7 +75,7 @@ export default class Avistaz extends BaseProvider {
       transform: body => cheerio.load(body)
     };
 
-    return rp(options).then(this.parseReleasePage);
+    return rp(options).then($ => this.parseReleasePage($));
   }
 
   private parseReleasePage($: CheerioStatic): SearchResult[] {
@@ -139,20 +140,20 @@ export default class Avistaz extends BaseProvider {
     const options: RequestPromiseOptions & UrlOptions = {
       url: this.loginUrl,
       jar: this.cookieJar,
-      resolveWithFullResponse: true
+      resolveWithFullResponse: true,
+      method: "POST",
+      form: info
     };
 
     return this.getToken()
       .then(token => info._token = token)
       .then(() => rp(options))
       .then((response: RequestResponse) => {
-        // if (r.uri.href === self.loginUrl) {
-        //   return reject("Could not log in");
-        // }
-
-        response.headers["set-cookie"].forEach(cookie => {
-          this.cookieJar.setCookie(cookie, this.baseUrl);
-        });
+        if (response.request.uri.href === this.loginUrl) {
+          throw "Could not login";
+        }
+      }).catch((error: StatusCodeError) => {
+        error.response.headers["set-cookie"].forEach(cookie => this.cookieJar.setCookie(cookie, this.baseUrl));
       });
   }
 
@@ -164,20 +165,19 @@ export default class Avistaz extends BaseProvider {
       resolveWithFullResponse: true
     };
 
-    return rp(options)
-      .then((response: RequestResponse) => {
-        response.headers["set-cookie"].forEach(cookie => {
-          this.cookieJar.setCookie(cookie, this.baseUrl);
-        });
-
-        const regex = tokenRegex.exec(response.body);
-
-        if (!regex || !regex[1]) {
-          throw "Invalid HTML";
-        }
-
-        return regex[1];
+    return rp(options).then((response: RequestResponse) => {
+      response.headers["set-cookie"].forEach(cookie => {
+        this.cookieJar.setCookie(cookie, this.baseUrl);
       });
+
+      const regex = tokenRegex.exec(response.body);
+
+      if (!regex || !regex[1]) {
+        throw "Invalid HTML";
+      }
+
+      return regex[1];
+    });
   }
 
   private test(): Bluebird<void> {
@@ -187,12 +187,11 @@ export default class Avistaz extends BaseProvider {
       resolveWithFullResponse: true
     };
 
-    return rp(options)
-      .then((response: RequestResponse) => {
-        if (response.url === this.loginUrl) {
-          throw "Could not login";
-        }
-      });
+    return rp(options).then((response: RequestResponse) => {
+      if (response.request.uri.href === this.loginUrl) {
+        throw "Could not login";
+      }
+    });
   }
 
   /**

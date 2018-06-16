@@ -17,6 +17,5 @@ function search() {
 
   return Queue.find({}).exec()
     .then((queue: QueueDocument[]) => Bluebird.each(queue, searcher.search))
-    .then(console.log)
     .catch(console.error);
 }
